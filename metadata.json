@@ -1,0 +1,8 @@
+{
+  "name": "Siva Bhaskar Kora Portfolio",
+  "description": "Architectural minimal portfolio of Siva Bhaskar Kora, AI/ML engineer and technical researcher specializing in data pipelines, LLM fine-tuning, and intelligent systems.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
