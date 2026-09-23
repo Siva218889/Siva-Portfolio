@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PORTFOLIO_DATA } from '../data/portfolioData';
-import { Mail, Phone, ArrowUpRight, Copy, Check, Send, MessageSquare } from 'lucide-react';
+import { ArrowUpRight, Copy, Check, Send, MessageSquare, Loader2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
 
 export const ContactSection: React.FC = () => {
   const { personal } = PORTFOLIO_DATA;
@@ -8,11 +8,14 @@ export const ContactSection: React.FC = () => {
   const [copiedPhone, setCopiedPhone] = useState(false);
   
   // Interactive message state
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sentSuccess, setSentSuccess] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(personal.email);
@@ -26,19 +29,77 @@ export const ContactSection: React.FC = () => {
     setTimeout(() => setCopiedPhone(false), 2000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const getMailtoUrl = () => {
+    const subject = encodeURIComponent(
+      senderName ? `[Portfolio Inquiry] From ${senderName}` : 'Portfolio Inquiry / Opportunity'
+    );
+    const body = encodeURIComponent(
+      `${message || 'Hello Siva,\n\nI came across your portfolio and would like to discuss an opportunity with you.'}\n\nSender: ${senderName || 'Recruiter'}\nEmail: ${senderEmail || 'N/A'}`
+    );
+    return `mailto:${personal.email}?subject=${subject}&body=${body}`;
+  };
+
+  const getWebGmailUrl = () => {
+    const subject = encodeURIComponent(
+      senderName ? `[Portfolio Inquiry] From ${senderName}` : 'Portfolio Inquiry / Opportunity'
+    );
+    const body = encodeURIComponent(
+      `${message || 'Hello Siva,\n\nI came across your portfolio and would like to discuss an opportunity with you.'}\n\nSender: ${senderName || 'Recruiter'}\nEmail: ${senderEmail || 'N/A'}`
+    );
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${personal.email}&su=${subject}&body=${body}`;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!senderName || !senderEmail || !message) return;
     
-    // Simulating message dispatch with mailto fallback
-    setSentSuccess(true);
-    setTimeout(() => {
-      setSentSuccess(false);
-      setSenderName('');
-      setSenderEmail('');
-      setMessage('');
-      setShowForm(false);
-    }, 2500);
+    setIsSubmitting(true);
+    setFeedbackMessage(null);
+    setIsError(false);
+    setSentSuccess(false);
+
+    try {
+      const res = await fetch(`https://formsubmit.co/ajax/${personal.email}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          name: senderName,
+          email: senderEmail,
+          message: message,
+          _subject: `New Portfolio Message from ${senderName}`,
+          _captcha: 'false',
+          _template: 'table',
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && (data?.success === 'true' || data?.success === true)) {
+        setSentSuccess(true);
+        setFeedbackMessage('Message dispatched! It has been delivered directly to sivabhaskarkora@gmail.com.');
+        setSenderName('');
+        setSenderEmail('');
+        setMessage('');
+      } else if (data?.message && data.message.includes('Activation')) {
+        setSentSuccess(true);
+        setFeedbackMessage("Your message was dispatched! Note: FormSubmit has sent a one-time activation link to sivabhaskarkora@gmail.com to confirm inbox forwarding.");
+        setSenderName('');
+        setSenderEmail('');
+        setMessage('');
+      } else {
+        throw new Error(data?.message || 'Form dispatch service error');
+      }
+    } catch (err: any) {
+      setIsError(true);
+      setFeedbackMessage(
+        'Could not dispatch automatically via web API. Please use "Open in Web Gmail" or "Mail App" below to send directly.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -199,28 +260,69 @@ export const ContactSection: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono text-[#64748b]">
-                  Directly dispatched to sivabhaskarkora@gmail.com
-                </span>
-
-                <button
-                  type="submit"
-                  disabled={sentSuccess}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded bg-[#f3f4f6] text-[#0c0e11] text-xs font-mono font-medium hover:bg-white transition-colors cursor-pointer"
+              {/* Feedback alert */}
+              {feedbackMessage && (
+                <div
+                  className={`p-3 rounded text-xs font-mono flex items-start gap-2 border ${
+                    isError
+                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  }`}
                 >
-                  {sentSuccess ? (
-                    <>
-                      <Check size={12} className="text-emerald-600" />
-                      <span>Message Dispatched!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send size={12} />
-                      <span>Transmit Message</span>
-                    </>
-                  )}
-                </button>
+                  {isError ? <AlertCircle size={15} className="shrink-0 mt-0.5" /> : <Check size={15} className="shrink-0 mt-0.5" />}
+                  <div className="flex-1 leading-relaxed">
+                    {feedbackMessage}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+                <div className="flex items-center flex-wrap gap-2 text-[11px] font-mono text-[#64748b]">
+                  <span>Target: {personal.email}</span>
+                  <span>•</span>
+                  <a
+                    href={getWebGmailUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#38bdf8] hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Open in Web Gmail</span>
+                    <ExternalLink size={10} />
+                  </a>
+                  <span>•</span>
+                  <a
+                    href={getMailtoUrl()}
+                    className="text-[#38bdf8] hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Mail App</span>
+                    <Mail size={10} />
+                  </a>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded bg-[#f3f4f6] text-[#0c0e11] text-xs font-mono font-medium hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : sentSuccess ? (
+                      <>
+                        <Check size={12} className="text-emerald-600" />
+                        <span>Sent to Siva!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={12} />
+                        <span>Transmit Message</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           )}
